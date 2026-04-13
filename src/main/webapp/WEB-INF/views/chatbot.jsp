@@ -154,4 +154,8 @@
     #chatthread img {
         margin-left: 50px !important;
     }
+
+    #chatmessage {
+        resize: none;
+    }
 </style>

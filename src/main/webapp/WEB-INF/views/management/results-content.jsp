@@ -927,7 +927,7 @@
 		function synchronizeTableSizes()
 		{
 			$('#contentstable2').css("width", $('#contentstable').css("width"));
-			
+
 			var headerrow = $('#contentstable TR').first();
 			var newWidth;
 			var widths = [];			
@@ -1225,6 +1225,7 @@
 							  $("#tbllist-empty").hide();
 						  }
 						  $( "#wheel" ).hide();
+						  synchronizeTableSizes();
 						  return;
 					  }
 

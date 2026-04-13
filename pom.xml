@@ -690,15 +690,30 @@
 							     <include>ehcache.xml</include>
 							</includes>
 						</resource>
-						<resource>
+						<!--<resource-->
 						<!-- Copies src/main/config/environment/spring.properties to  -->
                         <!-- war/WEB-INF/spring.properties -->
-                        <directory>src/main/config/${environment}</directory>
+                        <!--directory>src/main/config/${environment}</directory>
                             <targetPath>WEB-INF</targetPath>
                             <includes>
                                  <include>spring.properties</include>
                             </includes>
-                        </resource>
+                        </resource-->
+						<!-- Copy Fonts -->
+						<resource>
+							<directory>src/main/java/Fonts</directory>
+							<targetPath>WEB-INF/classes/Fonts</targetPath>
+							<includes>
+								<include>*.ttf</include>
+							</includes>
+						</resource>
+						<resource>
+							<directory>src/main/resources</directory>
+							<targetPath>WEB-INF/classes</targetPath>
+							<includes>
+								<include>log4j.xml</include>
+							</includes>
+						</resource>
 						<!-- Copy Fonts -->
 						<resource>
 							<directory>src/main/java/Fonts</directory>
