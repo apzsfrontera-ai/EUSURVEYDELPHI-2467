@@ -125,23 +125,25 @@ public class DepartmentUpdater implements Runnable {
 			throw new Exception("comref keypassword is null");
 		}
 
-		// Step 1: Load the PKCS12 keystore
 		KeyStore keyStore = KeyStore.getInstance("PKCS12");
 		InputStream keyStoreInput = servletContext.getResourceAsStream(certificatepath);
 
 		keyStore.load(keyStoreInput, keystorepassword.toCharArray());
 
-		// Step 2: Initialize SSL Context with the keystore
-		KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
-		kmf.init(keyStore, keypassword.toCharArray());
+		// Trust own CA and all self-signed certs
+		SSLContext sslcontext = SSLContexts.custom()
+				.loadKeyMaterial(keyStore, keypassword.toCharArray())
+				//.loadTrustMaterial(trustStore, new TrustSelfSignedStrategy())
+				.build();
+		// Allow TLSv1 protocol only
+		SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(
+				sslcontext,
+				SSLConnectionSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER);
+		CloseableHttpClient httpclient = HttpClients.custom()
+				.setHostnameVerifier(SSLConnectionSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER)
+				.setSSLSocketFactory(sslsf)
+				.build();
 
-		SSLContext sslContext = SSLContext.getInstance("TLS");
-		sslContext.init(kmf.getKeyManagers(), null, null);
-
-		// Step 3: Set the default SSL context
-		SSLContext.setDefault(sslContext);
-
-		// Step 4: Create a connection
 		int start = 0;
 		boolean stop = false;
 
@@ -152,16 +154,45 @@ public class DepartmentUpdater implements Runnable {
 		while (!stop) {
 			logger.info("calling comref, start = " + start);
 
-			URL url = new URL(comrefURL + "&length=1000&start=" + start);
-			HttpsURLConnection connection = (HttpsURLConnection) url.openConnection();
-			connection.setRequestMethod("GET");
-			int responseCode = connection.getResponseCode();
+			String departments = "";
 
-			if (responseCode != 200) {
-				throw new Exception("responseCode "  + responseCode);
+			try {
+
+				HttpGet httpget = new HttpGet(comrefURL + "&length=1000&start=" + start);
+				httpget.addHeader("Accept", "application/xml");
+
+				CloseableHttpResponse response = httpclient.execute(httpget);
+
+				try {
+
+					logger.info(response.getStatusLine());
+
+					if (response.getStatusLine().getStatusCode() != 200) {
+						throw new Exception("responseCode " + response.getStatusLine().getStatusCode() );
+					}
+
+					HttpEntity entity = response.getEntity();
+
+					departments = EntityUtils.toString(entity, "UTF-8");
+
+				} finally {
+					response.close();
+				}
+
+			} finally {
+				httpclient.close();
 			}
 
-			String departments = readData(connection);
+			//URL url = new URL(comrefURL + "&length=1000&start=" + start);
+			//HttpsURLConnection connection = (HttpsURLConnection) url.openConnection();
+			//connection.setRequestMethod("GET");
+//			int responseCode = connection.getResponseCode();
+//
+//			if (responseCode != 200) {
+//				throw new Exception("responseCode "  + responseCode);
+//			}
+//
+//			String departments = readData(connection);
 
 			Document document = builder.parse(new InputSource(new StringReader(departments)));
 
@@ -274,22 +305,10 @@ public class DepartmentUpdater implements Runnable {
 			throw new Exception("comref keypassword is null");
 		}
 
-		// Step 1: Load the PKCS12 keystore
 		KeyStore keyStore = KeyStore.getInstance("PKCS12");
 		InputStream keyStoreInput = servletContext.getResourceAsStream(certificatepath);
 
 		keyStore.load(keyStoreInput, keystorepassword.toCharArray());
-
-		// Step 2: Initialize SSL Context with the keystore
-		//KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
-		//kmf.init(keyStore, keypassword.toCharArray());
-
-		//SSLContext sslContext = SSLContext.getInstance("TLS");
-		//sslContext.init(kmf.getKeyManagers(), null, null);
-
-		// Step 3: Set the default SSL context
-		//SSLContext.setDefault(sslContext);
-
 
 		// Trust own CA and all self-signed certs
 		SSLContext sslcontext = SSLContexts.custom()
@@ -305,22 +324,16 @@ public class DepartmentUpdater implements Runnable {
 				.setSSLSocketFactory(sslsf)
 				.build();
 
-		// Step 4: Create a connection
 		TreeMap<String, String> domains = new TreeMap<>();
 
 		logger.info("calling comref domains");
-
-		//URL url = new URL(comrefURLDomains);
 
 		String sdomains = "";
 
 		try {
 
 			HttpGet httpget = new HttpGet(comrefURLDomains);
-
-			//HttpsURLConnection connection = (HttpsURLConnection) url.openConnection();
-			//connection.setRequestMethod("GET");
-			//int responseCode = connection.getResponseCode();
+			httpget.addHeader("Accept", "application/xml");
 
 			CloseableHttpResponse response = httpclient.execute(httpget);
 
@@ -343,8 +356,6 @@ public class DepartmentUpdater implements Runnable {
 		} finally {
 			httpclient.close();
 		}
-
-		//String sdomains = readData(connection);
 
 		logger.info(sdomains);
 
