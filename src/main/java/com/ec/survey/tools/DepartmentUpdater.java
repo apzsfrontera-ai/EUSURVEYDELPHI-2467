@@ -11,6 +11,7 @@ import java.util.*;
 
 import javax.annotation.Resource;
 import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.servlet.ServletContext;
@@ -23,6 +24,14 @@ import com.ec.survey.service.LdapDBService;
 import com.ec.survey.service.PropertiesService;
 import com.ec.survey.service.SessionService;
 import com.sun.source.util.Trees;
+import org.apache.http.HttpEntity;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.ssl.SSLContexts;
+import org.apache.http.util.EntityUtils;
 import org.apache.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -272,30 +281,72 @@ public class DepartmentUpdater implements Runnable {
 		keyStore.load(keyStoreInput, keystorepassword.toCharArray());
 
 		// Step 2: Initialize SSL Context with the keystore
-		KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
-		kmf.init(keyStore, keypassword.toCharArray());
+		//KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+		//kmf.init(keyStore, keypassword.toCharArray());
 
-		SSLContext sslContext = SSLContext.getInstance("TLS");
-		sslContext.init(kmf.getKeyManagers(), null, null);
+		//SSLContext sslContext = SSLContext.getInstance("TLS");
+		//sslContext.init(kmf.getKeyManagers(), null, null);
 
 		// Step 3: Set the default SSL context
-		SSLContext.setDefault(sslContext);
+		//SSLContext.setDefault(sslContext);
+
+
+		// Trust own CA and all self-signed certs
+		SSLContext sslcontext = SSLContexts.custom()
+				.loadKeyMaterial(keyStore, keypassword.toCharArray())
+				//.loadTrustMaterial(trustStore, new TrustSelfSignedStrategy())
+				.build();
+		// Allow TLSv1 protocol only
+		SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(
+				sslcontext,
+				SSLConnectionSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER);
+		CloseableHttpClient httpclient = HttpClients.custom()
+				.setHostnameVerifier(SSLConnectionSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER)
+				.setSSLSocketFactory(sslsf)
+				.build();
 
 		// Step 4: Create a connection
 		TreeMap<String, String> domains = new TreeMap<>();
 
 		logger.info("calling comref domains");
 
-		URL url = new URL(comrefURLDomains);
-		HttpsURLConnection connection = (HttpsURLConnection) url.openConnection();
-		connection.setRequestMethod("GET");
-		int responseCode = connection.getResponseCode();
+		//URL url = new URL(comrefURLDomains);
 
-		if (responseCode != 200) {
-			throw new Exception("responseCode " + responseCode);
+		String sdomains = "";
+
+		try {
+
+			HttpGet httpget = new HttpGet(comrefURLDomains);
+
+			//HttpsURLConnection connection = (HttpsURLConnection) url.openConnection();
+			//connection.setRequestMethod("GET");
+			//int responseCode = connection.getResponseCode();
+
+			CloseableHttpResponse response = httpclient.execute(httpget);
+
+			try {
+
+				logger.info(response.getStatusLine());
+
+				if (response.getStatusLine().getStatusCode() != 200) {
+					throw new Exception("responseCode " + response.getStatusLine().getStatusCode() );
+				}
+
+				HttpEntity entity = response.getEntity();
+
+				sdomains = EntityUtils.toString(entity, "UTF-8");
+
+			} finally {
+				response.close();
+			}
+
+		} finally {
+			httpclient.close();
 		}
 
-		String sdomains = readData(connection);
+		//String sdomains = readData(connection);
+
+		logger.info(sdomains);
 
 		Document document = builder.parse(new InputSource(new StringReader(sdomains)));
 
