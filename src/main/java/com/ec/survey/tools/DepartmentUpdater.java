@@ -97,16 +97,6 @@ public class DepartmentUpdater implements Runnable {
 		}
 	}
 
-	private String readData(HttpURLConnection conn) throws IOException {
-		BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-		StringBuilder sb = new StringBuilder();
-		for (int c; (c = in.read()) >= 0;) {
-			sb.append((char)c);
-		}
-		in.close();
-		return sb.toString();
-	}
-
 	private String getDepartments() throws Exception {
 		DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
 		DocumentBuilder builder = factory.newDocumentBuilder();
@@ -151,12 +141,12 @@ public class DepartmentUpdater implements Runnable {
 		Set<DepartmentsEntry> roots = new HashSet<>();
 		Set<Long> handledIds = new HashSet<>();
 
-		while (!stop) {
-			logger.info("calling comref, start = " + start);
+		try {
 
-			String departments = "";
+			while (!stop) {
+				logger.info("calling comref, start = " + start);
 
-			try {
+				String departments = "";
 
 				HttpGet httpget = new HttpGet(comrefURL + "&length=1000&start=" + start);
 				httpget.addHeader("Accept", "application/xml");
@@ -179,71 +169,60 @@ public class DepartmentUpdater implements Runnable {
 					response.close();
 				}
 
-			} finally {
-				httpclient.close();
-			}
+				Document document = builder.parse(new InputSource(new StringReader(departments)));
 
-			//URL url = new URL(comrefURL + "&length=1000&start=" + start);
-			//HttpsURLConnection connection = (HttpsURLConnection) url.openConnection();
-			//connection.setRequestMethod("GET");
-//			int responseCode = connection.getResponseCode();
-//
-//			if (responseCode != 200) {
-//				throw new Exception("responseCode "  + responseCode);
-//			}
-//
-//			String departments = readData(connection);
+				Node recordCount = document.getElementsByTagName("recordCount").item(0);
+				if (!recordCount.getTextContent().equals("1000")) {
+					stop = true; // we reached the last call
+				}
 
-			Document document = builder.parse(new InputSource(new StringReader(departments)));
+				NodeList nodeList = document.getElementsByTagName("_");
+				for (int i = 0; i < nodeList.getLength(); i++) {
+					Node node = nodeList.item(i);
 
-			Node recordCount = document.getElementsByTagName("recordCount").item(0);
-			if (!recordCount.getTextContent().equals("1000")) {
-				stop = true; // we reached the last call
-			}
+					DepartmentsEntry departmentsEntry = new DepartmentsEntry();
 
-			NodeList nodeList = document.getElementsByTagName("_");
-			for (int i = 0; i < nodeList.getLength(); i++) {
-				Node node = nodeList.item(i);
+					for (int j = 0; j < node.getChildNodes().getLength(); j++) {
+						Node child = node.getChildNodes().item(j);
+						switch (child.getNodeName()) {
+							case "orgcd":
+								departmentsEntry.orgcd = child.getTextContent();
+								break;
+							case "orgid":
+								departmentsEntry.orgid = Long.parseLong(child.getTextContent());
+								break;
+							case "orgidparent":
+								departmentsEntry.orgidparent = Long.parseLong(child.getTextContent());
+								break;
+							case "dtfin":
+								if (!child.getTextContent().equals("31/12/9999 00:00:00")) {
+									departmentsEntry.deleted = true;
+								}
+						}
+					}
 
-				DepartmentsEntry departmentsEntry = new DepartmentsEntry();
+					if (!departmentsEntry.deleted && departmentsEntry.orgcd != null && !departmentsEntry.orgcd.trim().isEmpty()) {
+						if (departmentsEntry.orgidparent == 0) {
+							roots.add(departmentsEntry);
+						}
 
-				for (int j = 0; j < node.getChildNodes().getLength(); j++) {
-					Node child = node.getChildNodes().item(j);
-					switch (child.getNodeName()) {
-						case "orgcd":
-							departmentsEntry.orgcd = child.getTextContent();
-							break;
-						case "orgid":
-							departmentsEntry.orgid = Long.parseLong(child.getTextContent());
-							break;
-						case "orgidparent":
-							departmentsEntry.orgidparent = Long.parseLong(child.getTextContent());
-							break;
-						case "dtfin":
-							if (!child.getTextContent().equals("31/12/9999 00:00:00")) {
-								departmentsEntry.deleted = true;
-							}
+						if (!map.containsKey(departmentsEntry.orgidparent)) {
+							map.put(departmentsEntry.orgidparent, new HashSet<>());
+						}
+
+						map.get(departmentsEntry.orgidparent).add(departmentsEntry);
 					}
 				}
 
-				if (!departmentsEntry.deleted && departmentsEntry.orgcd != null && !departmentsEntry.orgcd.trim().isEmpty()) {
-					if (departmentsEntry.orgidparent == 0) {
-						roots.add(departmentsEntry);
-					}
+				start+=1000;
 
-					if (!map.containsKey(departmentsEntry.orgidparent)) {
-						map.put(departmentsEntry.orgidparent, new HashSet<>());
-					}
-
-					map.get(departmentsEntry.orgidparent).add(departmentsEntry);
+				if (start > 20000) {
+					throw new Exception("too many calls");
 				}
 			}
 
-			start+=1000;
-
-			if (start > 20000) {
-				throw new Exception("too many calls");
-			}
+		} finally {
+			httpclient.close();
 		}
 
 		DepartmentsEntry main = new DepartmentsEntry();
