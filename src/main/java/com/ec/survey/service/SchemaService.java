@@ -69,6 +69,24 @@ public class SchemaService extends BasicService {
 	}
 
 	@Transactional
+	public void step136() {
+		Session session = sessionFactory.getCurrentSession();
+		Status status = getStatus();
+
+		String existing = settingsService.get(Setting.Chatbot);
+		if (existing == null) {
+			Setting s = new Setting();
+			s.setKey(Setting.Chatbot);
+			s.setValue("true");
+			s.setFormat("true / false");
+			session.saveOrUpdate(s);
+		}
+
+		status.setDbversion(136);
+		session.saveOrUpdate(status);
+	}
+
+	@Transactional
 	public void step135() {
 		Session session = sessionFactory.getCurrentSession();
 		Status status = getStatus();

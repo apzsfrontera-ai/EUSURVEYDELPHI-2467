@@ -13,4 +13,6 @@
 	</div>
 </div>
 
-<%@ include file="chatbot.jsp" %>
+<c:if test="${showchatbot}">
+    <%@ include file="chatbot.jsp" %>
+</c:if>

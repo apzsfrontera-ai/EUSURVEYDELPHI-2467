@@ -95,6 +95,8 @@ public class ServerEnvironmentHandlerInterceptor extends HandlerInterceptorAdapt
 
 	private @Value("${contextpath:/eusurvey}") String contextpath;
 	private @Value("${googlesiteverification:#{null}}") String googlesiteverification;
+
+	public static final String APPLICATION_SHOWCHATBOT = "showchatbot";
 	
 	@Resource(name="settingsService")
 	private SettingsService settingsService;
@@ -175,6 +177,9 @@ public class ServerEnvironmentHandlerInterceptor extends HandlerInterceptorAdapt
             modelAndView.getModelMap().addAttribute(APPLICATION_OSS, oss != null && oss.equalsIgnoreCase("true"));
             modelAndView.getModelMap().addAttribute(APPLICATION_PIWIK, piwik != null && piwik.equalsIgnoreCase("true"));
             modelAndView.getModelMap().addAttribute(APPLICATION_SHOWPRIVACY, showPrivacy != null && showPrivacy.equalsIgnoreCase("true"));
+
+			String enablechatbot = settingsService.get(Setting.Chatbot);
+			modelAndView.getModelMap().addAttribute(APPLICATION_SHOWCHATBOT, enablechatbot != null && enablechatbot.equalsIgnoreCase("true"));
             
             modelAndView.getModelMap().addAttribute("contextpath", contextpath);
             modelAndView.getModelMap().addAttribute("monitoringEmail", monitoringEmail);
