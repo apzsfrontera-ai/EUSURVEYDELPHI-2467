@@ -440,7 +440,7 @@ public class ParticipantsController extends BasicController {
 						published.setSecurity(form.getSurvey().getSecurity());
 						published.setEcasSecurity(true);
 						published.setEcasMode("listmembers");
-						surveyService.update(published, false);
+						surveyService.update(published, true);
 					}
 				}
 			}
