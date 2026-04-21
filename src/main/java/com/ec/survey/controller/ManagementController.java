@@ -111,6 +111,7 @@ public class ManagementController extends BasicController {
 	public @Value("${evote.template-ispra:#{null}}") String evoteIspraTemplate;
 	public @Value("${evote.template-outside:#{null}}") String evoteOutsideTemplate;
 	public @Value("${evote.template-president:#{null}}") String evotePresidenTemplate;
+	public @Value("${evote.template-eeas:#{null}}") String evoteEEASTemplate;
 	
 	private final String LastEVoteTestResult = "LastEVoteTestResult";
 	
@@ -913,7 +914,11 @@ public class ManagementController extends BasicController {
 
                 result.getSurvey().setCollectSNC("true".equals(request.getParameter("collectsnc")));
 
+				var org = Tools.filterHTML(parameters.get("organisation")[0]);
+				if (org.isEmpty()) org = "OTHER";
+
 				if (result.getActiveSurvey() != null) {
+					result.getActiveSurvey().setOrganisation(org);
 					result.getActiveSurvey().setShortname(Tools.escapeHTML(parameters.get(Constants.SHORTNAME)[0]));
 					result.getActiveSurvey().setTitle(Tools.filterHTML(parameters.get("title")[0]));
 					result.getActiveSurvey().setLanguage(objLang);
@@ -927,7 +932,7 @@ public class ManagementController extends BasicController {
 
 				if (result != null && result.getSurvey() != null) {
 
-					result.getSurvey().setOrganisation(Tools.filterHTML(parameters.get("organisation")[0]));
+					result.getSurvey().setOrganisation(org);
 					result.getSurvey().setValidator(Tools.filterHTML(parameters.get("validator")[0]));
 					boolean sendOrganisationValidationEmail = checkSendOrganisationValidationEmail(result.getSurvey(), u);
 					
@@ -1198,6 +1203,9 @@ public class ManagementController extends BasicController {
 						break;
 					case "p":
 						templateUid = evotePresidenTemplate;
+						break;
+					case "e":
+						templateUid = evoteEEASTemplate;
 						break;
 					default:
 						templateUid = null;
@@ -2576,43 +2584,30 @@ public class ManagementController extends BasicController {
 		}
 		
 		if (form.getSurvey().getIsSelfAssessment()) {
-			List<SACriterion> criteria = selfassessmentService.getCriteria(form.getSurvey().getUniqueId());
-			StringBuilder builder = new StringBuilder();
-			builder.append("[");
-			boolean first = true;
-			for (SACriterion saCriterion : criteria) {
-				if (first) {
-					first = false;
-				} else {
-					builder.append(",");
-				}
-				builder.append("{");
-				builder.append("'id': '").append(saCriterion.getId()).append("',");
-				builder.append("'name': '").append(ConversionTools.escape(saCriterion.getName())).append("'");
-				builder.append("}");
-			}
-			builder.append("]");
+
+
+			var criteria = selfassessmentService.getCriteria(form.getSurvey().getUniqueId());
+
+			var criteriaMaps = criteria.stream().map((saCriterion -> {
+				var criteriaMap = new HashMap<String, Object>(4);
+				criteriaMap.put("id", saCriterion.getId());
+				criteriaMap.put("name", saCriterion.getName());
+				return criteriaMap;
+			})).collect(Collectors.toUnmodifiableList());
+
+			var objectMapper = new ObjectMapper();
+			result.addObject("SACriteriaJSON", objectMapper.writeValueAsString(criteriaMaps));
 			
-			result.addObject("SACriteria", builder.toString());
-			
-			List<SATargetDataset> datasets = selfassessmentService.getTargetDatasets(form.getSurvey().getUniqueId());
-			builder = new StringBuilder();
-			builder.append("[");
-			first = true;
-			for (SATargetDataset dataset : datasets) {
-				if (first) {
-					first = false;
-				} else {
-					builder.append(",");
-				}
-				builder.append("{");
-				builder.append("'id': '").append(dataset.getId()).append("',");
-				builder.append("'name': '").append(ConversionTools.escape(dataset.getName())).append("'");
-				builder.append("}");
-			}
-			builder.append("]");
-			
-			result.addObject("SADatasets", builder.toString());
+			var datasets = selfassessmentService.getTargetDatasets(form.getSurvey().getUniqueId());
+
+			var datasetMaps = datasets.stream().map(dataset -> {
+				var datasetMap = new HashMap<String, Object>(4);
+				datasetMap.put("id", dataset.getId());
+				datasetMap.put("name", dataset.getName());
+				return datasetMap;
+			}).collect(Collectors.toUnmodifiableList());
+
+			result.addObject("SADatasetsJSON", objectMapper.writeValueAsString(datasetMaps));
 		}
 
 		return result;
@@ -4167,7 +4162,7 @@ public class ManagementController extends BasicController {
 										s.append("; ");
 									}
 									
-									if (childQuestion.getCellType() == ComplexTableItem.CellType.SingleChoice || childQuestion.getCellType() == ComplexTableItem.CellType.MultipleChoice) {
+									if (childQuestion.isChoice()) {
 										s.append(form.getEscapedAnswerTitle(answer));
 										s.append("<span class='assignedValue hideme'>").append(form.getAnswerShortname(answer))
 												.append("</span>");

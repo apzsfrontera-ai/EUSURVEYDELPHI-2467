@@ -12,3 +12,7 @@
 		<button id="btnDeleteUserMessage" class="btn btn-default" onclick="deleteUserMessage()"><spring:message code="label.DeleteMessage" /></button>
 	</div>
 </div>
+
+<c:if test="${showchatbot}">
+    <%@ include file="chatbot.jsp" %>
+</c:if>

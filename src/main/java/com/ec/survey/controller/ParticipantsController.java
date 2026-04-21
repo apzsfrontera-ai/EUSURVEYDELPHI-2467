@@ -440,7 +440,7 @@ public class ParticipantsController extends BasicController {
 						published.setSecurity(form.getSurvey().getSecurity());
 						published.setEcasSecurity(true);
 						published.setEcasMode("listmembers");
-						surveyService.update(published, false);
+						surveyService.update(published, true);
 					}
 				}
 			}
@@ -972,22 +972,6 @@ public class ParticipantsController extends BasicController {
 //		paging.setItems(users);
 
 		return paging;
-	}
-	
-	@GetMapping(value = "/topDepartmentsJSON", headers="Accept=*/*")
-	public @ResponseBody List<KeyValue> topDepartments(HttpServletRequest request, HttpServletResponse response ) throws InvalidURLException {
-		
-		if (!isAjax(request))
-		{
-			throw new InvalidURLException();
-		}
-		
-		String domain = request.getParameter("domain");
-		if (domain == null) {
-			domain = "eu.europa.ec";
-		}
-		
-		return ldapService.getTopDepartments(domain);		
 	}
 
 	@GetMapping(value = "/departmentsJSON", headers = "Accept=*/*")

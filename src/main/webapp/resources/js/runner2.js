@@ -98,6 +98,11 @@ function addElement(element, foreditor, forskin)
 	var container = $(".emptyelement[data-id=" + id + "]");
 	$(container).removeClass("emptyelement");
 	$(container).find("img").remove();
+
+	//The container is no longer available -> Content was already restored using edit_actions.restore()
+	if (container.length === 0) {
+		return container
+	}
 	
 	addElementToContainer(element, container, foreditor, forskin);
 	
@@ -755,7 +760,8 @@ function addStatisticsToAnswerText(div, result) {
 		if (false === remove) {
 			for (var i = 0; (result.data.length > i) && (len > i); ++i) {
 				possibleAnswersArray()[i].delphiAnswerCount(result.data[i].value);
-				possibleAnswersArray()[i].useSavedDisplayMode(true);
+				if (viewModel.likert && viewModel.likert())
+					possibleAnswersArray()[i].useSavedDisplayMode(true);
 			}
 		} else {
 			for (var j = 0; len > j; ++j) {
@@ -953,8 +959,25 @@ function getDelphiQuestionUid(element)
 	}
 }
 
+function destroyAllTooltips() {
+	//$('[data-toggle="tooltip"]').tooltip("dispose");
+	//Bootstrap 3 has a bug with tooltip dispose. We need to manually implement it
+
+	//All open tooltips
+	$('[id^=tooltip][role=tooltip].tooltip').each((i, el) => {
+		//Remove aria link
+		const describedElement = document.querySelector(`[aria-describedby=${el.id}]`)
+		if (describedElement != null) {
+			describedElement.removeAttribute("aria-describedby")
+		}
+		//Remove tooltip element from dom
+		el.remove()
+	})
+}
+
 function sortDelphiTable(element, direction) {
-	$('[data-toggle="tooltip"]').tooltip("hide");
+	destroyAllTooltips()
+
 	var surveyElement = $(element).closest(".survey-element");
 	var uid = $(surveyElement).attr("data-uid");
 	var viewModel = modelsForDelphiQuestions[uid];
